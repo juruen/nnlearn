@@ -78,3 +78,40 @@ func TestName(t *testing.T) {
 	q := New()
 	assert.Equal(t, "quadratic_error", q.Name())
 }
+
+func TestPartialCostA(t *testing.T) {
+	q := New()
+
+	t.Run("basic derivative", func(t *testing.T) {
+		// ∂C/∂a = (a - y)
+		y := vec(1, 0, 0)
+		a := vec(0.8, 0.1, 0.2)
+
+		result, err := q.PartialCostA(y, a)
+
+		require.NoError(t, err)
+		require.Equal(t, 3, result.Len())
+		assert.InDelta(t, -0.2, result.AtVec(0), 1e-10)
+		assert.InDelta(t, 0.1, result.AtVec(1), 1e-10)
+		assert.InDelta(t, 0.2, result.AtVec(2), 1e-10)
+	})
+
+	t.Run("zero when equal", func(t *testing.T) {
+		y := vec(1, 2, 3)
+		a := vec(1, 2, 3)
+
+		result, err := q.PartialCostA(y, a)
+
+		require.NoError(t, err)
+		for i := range result.Len() {
+			assert.Equal(t, 0.0, result.AtVec(i))
+		}
+	})
+
+	t.Run("dimension mismatch", func(t *testing.T) {
+		_, err := q.PartialCostA(vec(1, 2), vec(1, 2, 3))
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, types.ErrDimensionMismatch)
+	})
+}

@@ -2,20 +2,22 @@
 package nn
 
 import (
+	"fmt"
 	"math/rand/v2"
 
+	maths "nnlearn/internal/math"
 	"nnlearn/internal/types"
 )
 
 // FeedForward is a feedforward neural network.
 type FeedForward struct {
-	inputLen   int
-	outputLen  int
-	hiddenLens []int
-	weights    []types.Matrix
-	biases     []types.Vector
-	activation types.Activation
-	cost       types.Cost
+	inputLen     int
+	outputLen    int
+	hiddenLens   []int
+	weights      []types.Matrix
+	biases       []types.Vector
+	activateFunc types.Activation
+	costFunc     types.Cost
 }
 
 var _ types.NeuralNetwork = (*FeedForward)(nil)
@@ -42,13 +44,13 @@ func NewFeedForward(inputLen int, hiddenLens []int, outputLen int, opts ...Optio
 	}
 
 	return &FeedForward{
-		inputLen:   inputLen,
-		outputLen:  outputLen,
-		hiddenLens: hiddenLens,
-		weights:    weights,
-		biases:     biases,
-		activation: o.activation,
-		cost:       o.cost,
+		inputLen:     inputLen,
+		outputLen:    outputLen,
+		hiddenLens:   hiddenLens,
+		weights:      weights,
+		biases:       biases,
+		activateFunc: o.activation,
+		costFunc:     o.cost,
 	}
 }
 
@@ -78,9 +80,108 @@ func (ff *FeedForward) Biases(layer int) types.Vector {
 }
 
 // Train trains a batch of training samples and returns the computed gradient.
-func (ff *FeedForward) Train(_ types.TrainingBatch) (gradient types.Gradient) {
-	// TODO implement me
-	panic("implement me")
+func (ff *FeedForward) Train(b types.TrainingBatch) (*types.TrainBatchResult, error) {
+	if len(b.Inputs) != len(b.Outputs) {
+		return nil, fmt.Errorf("inputs and outputs have different lengths")
+	}
+
+	for i := range b.Inputs {
+		if b.Inputs[i].Len() != ff.inputLen {
+			return nil, fmt.Errorf("%w: input length mismatch for sample %d: expected %d, got %d",
+				types.ErrDimensionMismatch, i, ff.inputLen, b.Inputs[i].Len())
+		}
+	}
+
+	for i := range b.Outputs {
+		if b.Outputs[i].Len() != ff.outputLen {
+			return nil, fmt.Errorf("%w: output length mismatch for sample %d: expected %d, got %d",
+				types.ErrDimensionMismatch, i, ff.outputLen, b.Outputs[i].Len())
+		}
+	}
+
+	result := types.TrainBatchResult{
+		Results: make([]types.TrainSingleResult, 0, len(b.Inputs)),
+	}
+
+	// Back-propagation algorithm
+
+	// n - is the number of training samples in the batch
+	n := len(b.Inputs)
+
+	// for each training sample "i"
+	for i := 0; i < n; i++ {
+		// aVecs - are the activateFunc vectors for each layer
+		aVecs := make([]types.Vector, 2+len(ff.hiddenLens))
+
+		// Step 1 - Initialize the first "a" vec with the input vector for each training sample
+		aVecs[0] = b.Inputs[i]
+
+		// Step 2 - Feed forward each layer l and compute the "z" vector for each layer l
+		// z_l = w^la^(l-1)+b_l
+		zVecs := make([]types.Vector, len(ff.hiddenLens)+1)
+		for l := 0; l < len(ff.hiddenLens)+1; l++ {
+			// weightsTimesA -  w^la^(l-1
+			weightsTimesA := maths.MulMatrixVector(ff.Weights(l), aVecs[l])
+			// z[l] = weightsTimesA + b_j
+			zVecs[l] = maths.AddVectors(weightsTimesA, ff.Biases(l))
+			// a_l=sigma(z_l)
+			aVecs[l+1] = maths.ApplyFuncToVector(zVecs[l], ff.activateFunc.Activate)
+		}
+
+		// Step 3 - compute output error in eta^L using the hadamart product of dC/da and sigma_prime(z^L)
+		deltaVecs := make([]types.Vector, len(ff.hiddenLens)+1)
+
+		// gradientAL = dC/da  at output layer (L)
+		gradientAL, err := ff.costFunc.PartialCostA(b.Outputs[i], aVecs[len(aVecs)-1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute partial cost derivative: %w", err)
+		}
+
+		// sigmaPrimeZL is sigma_prime(z^L)
+		sigmaPrimeZL := maths.ApplyFuncToVector(zVecs[len(zVecs)-1], ff.activateFunc.ActivatePrime)
+
+		// delta_L is the hadamart product of gradientAL and sigmaPrimeZL
+		deltaVecs[len(deltaVecs)-1] = maths.MulElemVec(gradientAL, sigmaPrimeZL)
+
+		// Step 4 - backprop the error to compute delta for each layer l = L-1, L-2, ..., 1
+		// by doing delta^l = (w^(l+1))^T eta^(l+1) * sigma_prime(z^l)
+		for l := len(deltaVecs) - 2; l >= 0; l-- {
+			// w^T is the transpose of the weight matrix for layer l+1
+			weightsTrans := maths.Transpose(ff.Weights(l + 1))
+
+			// weightsEtaProd is the product of the transposed weight matrix and the delta vector for layer l+1
+			weightsEtaProd := maths.MulMatrixVector(weightsTrans, deltaVecs[l+1])
+
+			// sigmaPrimeZL is sigma_prime(z^l)
+			sigmaPrimeZL := maths.ApplyFuncToVector(zVecs[l], ff.activateFunc.ActivatePrime)
+
+			// delta^l is the hadamart product of weightsEtaProd and sigmaPrimeZL
+			deltaVecs[l] = maths.MulElemVec(weightsEtaProd, sigmaPrimeZL)
+		}
+
+		// Step 5 - compute gradient of cost function with respect to weights and biases
+		weightGradients := make([]types.Matrix, 0, len(ff.hiddenLens)+1)
+		biasGradients := make([]types.Vector, 0, len(ff.hiddenLens)+1)
+
+		for l := 0; l < len(deltaVecs); l++ {
+			// Gradient at dC/W^l is the outer product of delta^l and a^(l-1)
+			// As len(deltaVecs) = len(aVecs)-1, we can use l to index both deltaVecs and aVecs
+			weightGradients = append(weightGradients, maths.OuterProduct(deltaVecs[l], aVecs[l]))
+
+			// Gradient at dC/db^l_j=delta^l_j
+			biasGradients = append(biasGradients, deltaVecs[l])
+		}
+
+		result.Results = append(result.Results, types.TrainSingleResult{
+			AVectors:        aVecs,
+			ZVectors:        zVecs,
+			DeltaVectors:    deltaVecs,
+			WeightGradients: weightGradients,
+			BiasGradients:   biasGradients,
+		})
+	}
+
+	return &result, nil
 }
 
 func allLayers(inputLen int, hiddenLens []int, outputLen int) []int {

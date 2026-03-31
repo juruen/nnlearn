@@ -55,14 +55,14 @@ func WithSeed(seed uint64) Option {
 	}
 }
 
-// WithActivation sets the activation function. Defaults to sigmoid.
+// WithActivation sets the activateFunc function. Defaults to sigmoid.
 func WithActivation(a types.Activation) Option {
 	return func(o *options) {
 		o.activation = a
 	}
 }
 
-// WithCost sets the cost function. Defaults to quadratic (MSE).
+// WithCost sets the costFunc function. Defaults to quadratic (MSE).
 func WithCost(c types.Cost) Option {
 	return func(o *options) {
 		o.cost = c

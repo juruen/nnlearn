@@ -3,6 +3,7 @@ package cost
 
 import (
 	"fmt"
+	maths "nnlearn/internal/math"
 
 	"nnlearn/internal/types"
 
@@ -53,6 +54,16 @@ func (q *Quadratic) Cost() (float64, error) {
 // Clear clears the tracked training error samples
 func (q *Quadratic) Clear() {
 	q.costs = nil
+}
+
+// PartialCostA returns the derivative of the cost function with respect to the activation of the output layer,
+// which is simply (a - y) for the quadratic cost function.
+func (q *Quadratic) PartialCostA(y, a types.Vector) (types.Vector, error) {
+	if y.Len() != a.Len() {
+		return nil, fmt.Errorf("%w: y has length %d, a has length %d", types.ErrDimensionMismatch, y.Len(), a.Len())
+	}
+
+	return maths.SubVectors(a, y), nil
 }
 
 // Name returns the name of the cost function

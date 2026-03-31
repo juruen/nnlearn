@@ -30,6 +30,9 @@ type Cost interface {
 	// Clear resets the cost to zero for the next epoch
 	Clear()
 
+	// PartialCostA returns the partial derivative of the cost function with respect to the activation of the output layer.
+	PartialCostA(y, a Vector) (Vector, error)
+
 	// Name returns the name of the cost function
 	Name() string
 }
@@ -55,6 +58,29 @@ type TrainingBatch struct {
 	Outputs []Vector
 }
 
+// TrainSingleResult is the interim result of a single training sample
+type TrainSingleResult struct {
+	// AVectors is the activation vectors at layer l
+	AVectors []Vector
+
+	// ZVectors is the weighted inputs at neurons at layer l
+	ZVectors []Vector
+
+	// DeltaVectors is the delta errors at neurons at layer l
+	DeltaVectors []Vector
+
+	// WeightGradients is the weight gradients at layer l
+	WeightGradients []Matrix
+
+	// BiasGradients is the bais gradients at layer l
+	BiasGradients []Vector
+}
+
+// TrainBatchResult holds the results of training a batch of samples.
+type TrainBatchResult struct {
+	Results []TrainSingleResult
+}
+
 // Gradient represent a descent gradient matrix
 type Gradient Matrix
 
@@ -77,5 +103,5 @@ type NeuralNetwork interface {
 
 	// Train trains a batch of training samples. Internally, the NN updates its weights based on the
 	// computed gradient. This intermediate gradient is also returned.
-	Train(batch TrainingBatch) (gradient Gradient)
+	Train(batch TrainingBatch) (result *TrainBatchResult, err error)
 }
