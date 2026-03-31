@@ -69,11 +69,11 @@ type NeuralNetwork interface {
 	// OutputLength returns the length of the output layer of the neural network.
 	OutputLength() int
 
-	// Weights returns the neural networks weight matrix
-	Weights() mat.Matrix
+	// Weights returns the weight matrix for the given layer.
+	Weights(layer int) Matrix
 
-	// Biases returns the neural network biases matrix
-	Biases() mat.Matrix
+	// Biases returns the bias vector for the given layer.
+	Biases(layer int) Vector
 
 	// Train trains a batch of training samples. Internally, the NN updates its weights based on the
 	// computed gradient. This intermediate gradient is also returned.
