@@ -262,7 +262,7 @@ func TestTrain(t *testing.T) {
 // Step 4 — Gradients:
 //
 //	∂C/∂W = δ ⊗ xᵀ ≈ ┌ −0.1437  −0.2874 ┐
-//	                   └  0.00660  0.0132  ┘
+//	                 └  0.00660  0.0132 ┘
 //
 //	∂C/∂b = δ ≈ [−0.1437, 0.00660]ᵀ
 //
@@ -278,16 +278,9 @@ func TestNoHiddenLayers(t *testing.T) {
 
 	ff.biases = []types.Vector{mat.NewVecDense(2, []float64{0, 1})}
 
-	trainBatch := types.TrainingBatch{
-		Inputs:  []types.Vector{vec(1, 2)},
-		Outputs: []types.Vector{vec(1, 0)},
-	}
-
-	r, err := ff.Train(trainBatch)
+	res, err := ff.trainSingleSample(vec(1, 2), vec(1, 0))
 	require.NoError(t, err)
-	require.Len(t, r.Results, 1)
 
-	res := r.Results[0]
 	tol := 1e-3
 
 	// Verify z = W·x + b = [−1, 5]ᵀ
@@ -362,7 +355,7 @@ func TestNoHiddenLayers(t *testing.T) {
 // Step 6 — Hidden gradients:
 //
 //	∂C/∂W¹ = δ¹ ⊗ xᵀ ≈ ┌ −0.00777  0 ┐
-//	                      └ −0.00988  0 ┘
+//	                   └ −0.00988  0 ┘
 //	∂C/∂b¹ = δ¹ ≈ [−0.00777, −0.00988]ᵀ
 //
 // Note: second column of ∂C/∂W¹ is exactly 0 because x₂ = 0 (good sanity check).
@@ -391,16 +384,9 @@ func TestTwoLayersTrain(t *testing.T) {
 		mat.NewVecDense(1, []float64{0}),
 	}
 
-	trainBatch := types.TrainingBatch{
-		Inputs:  []types.Vector{vec(1, 0)},
-		Outputs: []types.Vector{vec(1)},
-	}
-
-	r, err := ff.Train(trainBatch)
+	res, err := ff.trainSingleSample(vec(1, 0), vec(1))
 	require.NoError(t, err)
-	require.Len(t, r.Results, 1)
 
-	res := r.Results[0]
 	tol := 1e-3
 
 	// --- Forward pass ---
@@ -453,4 +439,62 @@ func TestTwoLayersTrain(t *testing.T) {
 	// ∂C/∂b¹ ≈ [−0.00777, −0.00988]ᵀ
 	assert.InDelta(t, -0.00777, res.BiasGradients[0].AtVec(0), tol)
 	assert.InDelta(t, -0.00988, res.BiasGradients[0].AtVec(1), tol)
+}
+
+func TestValidateBatch(t *testing.T) {
+	ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
+
+	t.Run("valid batch", func(t *testing.T) {
+		err := ff.validateBatch(types.TrainingBatch{
+			Inputs:  []types.Vector{vec(1, 2), vec(3, 4)},
+			Outputs: []types.Vector{vec(1), vec(0)},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("mismatched input/output count", func(t *testing.T) {
+		err := ff.validateBatch(types.TrainingBatch{
+			Inputs:  []types.Vector{vec(1, 2)},
+			Outputs: []types.Vector{vec(1), vec(0)},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "different lengths")
+	})
+
+	t.Run("wrong input dimension", func(t *testing.T) {
+		err := ff.validateBatch(types.TrainingBatch{
+			Inputs:  []types.Vector{vec(1, 2, 3)},
+			Outputs: []types.Vector{vec(1)},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, types.ErrDimensionMismatch)
+		assert.Contains(t, err.Error(), "input length mismatch")
+	})
+
+	t.Run("wrong output dimension", func(t *testing.T) {
+		err := ff.validateBatch(types.TrainingBatch{
+			Inputs:  []types.Vector{vec(1, 2)},
+			Outputs: []types.Vector{vec(1, 2)},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, types.ErrDimensionMismatch)
+		assert.Contains(t, err.Error(), "output length mismatch")
+	})
+
+	t.Run("empty batch", func(t *testing.T) {
+		err := ff.validateBatch(types.TrainingBatch{
+			Inputs:  []types.Vector{},
+			Outputs: []types.Vector{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("error on second sample", func(t *testing.T) {
+		err := ff.validateBatch(types.TrainingBatch{
+			Inputs:  []types.Vector{vec(1, 2), vec(1, 2, 3)},
+			Outputs: []types.Vector{vec(1), vec(0)},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "sample 1")
+	})
 }
