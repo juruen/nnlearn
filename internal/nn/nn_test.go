@@ -233,7 +233,7 @@ func TestTrain(t *testing.T) {
 	})
 }
 
-// TestSimpleTrain tests a minimal 2→2 network (no hidden layers) end-to-end.
+// TestNoHiddenLayers tests a minimal 2→2 network (no hidden layers) end-to-end.
 //
 // Network: 2 inputs → 2 outputs, sigmoid activation, quadratic cost.
 //
@@ -268,7 +268,7 @@ func TestTrain(t *testing.T) {
 //
 // This test covers: matrix multiply, sigmoid (including saturation at z=5),
 // element-wise ops (Hadamard), and outer product.
-func TestSimpleTrain(t *testing.T) {
+func TestNoHiddenLayers(t *testing.T) {
 	ff := NewFeedForward(2, nil, 2, WithSeed(42))
 
 	ff.weights = []types.Matrix{mat.NewDense(2, 2, []float64{
@@ -317,4 +317,140 @@ func TestSimpleTrain(t *testing.T) {
 	require.Len(t, res.BiasGradients, 1)
 	assert.InDelta(t, -0.1437, res.BiasGradients[0].AtVec(0), tol)
 	assert.InDelta(t, 0.00660, res.BiasGradients[0].AtVec(1), tol)
+}
+
+// TestTwoLayersTrain tests a 2→2→1 network (hidden + output) end-to-end.
+//
+// Architecture: 2 inputs → 2 hidden → 1 output, sigmoid activation, quadratic cost.
+//
+// Given:
+//
+//	x = [1, 0]ᵀ    y = [1]
+//
+//	W¹ = ┌ 1  -1 ┐    b¹ = ┌ 0 ┐
+//	     └ 0   1 ┘         └ 0 ┘
+//
+//	W² = [ 1  1 ]      b² = [ 0 ]
+//
+// Step 1 — Forward pass:
+//
+//	z¹ = W¹·x + b¹ = [1, 0]ᵀ
+//	a¹ = σ(z¹) ≈ [0.73106, 0.5]ᵀ
+//	z² = W²·a¹ + b² ≈ [1.23106]
+//	a² = σ(z²) ≈ [0.77400]
+//
+// Step 2 — Cost:
+//
+//	C = ½(y − a²)² ≈ 0.02554
+//
+// Step 3 — Output delta:
+//
+//	σ′(z²) = a²(1−a²) ≈ 0.17492
+//	δ² = (a² − y) ⊙ σ′(z²) ≈ [−0.03953]
+//
+// Step 4 — Output gradients:
+//
+//	∂C/∂W² = δ² ⊗ (a¹)ᵀ ≈ [−0.02890, −0.01977]
+//	∂C/∂b² = δ² ≈ [−0.03953]
+//
+// Step 5 — Hidden delta (backprop through hidden layer):
+//
+//	(W²)ᵀ·δ² = [−0.03953, −0.03953]ᵀ
+//	σ′(z¹) ≈ [0.19661, 0.25]ᵀ
+//	δ¹ = ((W²)ᵀ·δ²) ⊙ σ′(z¹) ≈ [−0.00777, −0.00988]ᵀ
+//
+// Step 6 — Hidden gradients:
+//
+//	∂C/∂W¹ = δ¹ ⊗ xᵀ ≈ ┌ −0.00777  0 ┐
+//	                      └ −0.00988  0 ┘
+//	∂C/∂b¹ = δ¹ ≈ [−0.00777, −0.00988]ᵀ
+//
+// Note: second column of ∂C/∂W¹ is exactly 0 because x₂ = 0 (good sanity check).
+//
+// This test covers: multi-layer forward pass, sigmoid at hidden and output,
+// quadratic cost, transpose in hidden backprop, and outer products for weight gradients.
+func TestTwoLayersTrain(t *testing.T) {
+	ff := NewFeedForward(2, []int{2}, 1, WithSeed(42))
+
+	ff.weights = []types.Matrix{
+		// W¹: hidden layer weights
+		mat.NewDense(2, 2, []float64{
+			1, -1,
+			0, 1,
+		}),
+
+		// W²: output layer weights
+		mat.NewDense(1, 2, []float64{1, 1}),
+	}
+
+	ff.biases = []types.Vector{
+		// b¹: hidden layer biases
+		mat.NewVecDense(2, []float64{0, 0}),
+
+		// b²: output layer biases
+		mat.NewVecDense(1, []float64{0}),
+	}
+
+	trainBatch := types.TrainingBatch{
+		Inputs:  []types.Vector{vec(1, 0)},
+		Outputs: []types.Vector{vec(1)},
+	}
+
+	r, err := ff.Train(trainBatch)
+	require.NoError(t, err)
+	require.Len(t, r.Results, 1)
+
+	res := r.Results[0]
+	tol := 1e-3
+
+	// --- Forward pass ---
+
+	// z¹ = [1, 0]ᵀ
+	require.Len(t, res.ZVectors, 2)
+	assert.InDelta(t, 1.0, res.ZVectors[0].AtVec(0), tol)
+	assert.InDelta(t, 0.0, res.ZVectors[0].AtVec(1), tol)
+
+	// a¹ ≈ [0.73106, 0.5]ᵀ
+	require.Len(t, res.AVectors, 3)
+	assert.InDelta(t, 0.73106, res.AVectors[1].AtVec(0), tol)
+	assert.InDelta(t, 0.5, res.AVectors[1].AtVec(1), tol)
+
+	// z² ≈ [1.23106]
+	assert.InDelta(t, 1.23106, res.ZVectors[1].AtVec(0), tol)
+
+	// a² ≈ [0.77400]
+	assert.InDelta(t, 0.77400, res.AVectors[2].AtVec(0), tol)
+
+	// --- Deltas ---
+
+	// δ² ≈ [−0.03953]
+	require.Len(t, res.DeltaVectors, 2)
+	assert.InDelta(t, -0.03953, res.DeltaVectors[1].AtVec(0), tol)
+
+	// δ¹ ≈ [−0.00777, −0.00988]ᵀ
+	assert.InDelta(t, -0.00777, res.DeltaVectors[0].AtVec(0), tol)
+	assert.InDelta(t, -0.00988, res.DeltaVectors[0].AtVec(1), tol)
+
+	// --- Output layer gradients ---
+
+	// ∂C/∂W² ≈ [−0.02890, −0.01977]
+	require.Len(t, res.WeightGradients, 2)
+	assert.InDelta(t, -0.02890, res.WeightGradients[1].At(0, 0), tol)
+	assert.InDelta(t, -0.01977, res.WeightGradients[1].At(0, 1), tol)
+
+	// ∂C/∂b² ≈ [−0.03953]
+	require.Len(t, res.BiasGradients, 2)
+	assert.InDelta(t, -0.03953, res.BiasGradients[1].AtVec(0), tol)
+
+	// --- Hidden layer gradients ---
+
+	// ∂C/∂W¹ ≈ [−0.00777, 0; −0.00988, 0]
+	assert.InDelta(t, -0.00777, res.WeightGradients[0].At(0, 0), tol)
+	assert.InDelta(t, 0.0, res.WeightGradients[0].At(0, 1), tol)
+	assert.InDelta(t, -0.00988, res.WeightGradients[0].At(1, 0), tol)
+	assert.InDelta(t, 0.0, res.WeightGradients[0].At(1, 1), tol)
+
+	// ∂C/∂b¹ ≈ [−0.00777, −0.00988]ᵀ
+	assert.InDelta(t, -0.00777, res.BiasGradients[0].AtVec(0), tol)
+	assert.InDelta(t, -0.00988, res.BiasGradients[0].AtVec(1), tol)
 }
