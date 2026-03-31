@@ -103,72 +103,70 @@ func (ff *FeedForward) Train(b types.TrainingBatch) (*types.TrainBatchResult, er
 		Results: make([]types.TrainSingleResult, 0, len(b.Inputs)),
 	}
 
-	// Back-propagation algorithm
+	// Backpropagation algorithm
 
-	// n - is the number of training samples in the batch
+	// n is the number of training samples in the batch
 	n := len(b.Inputs)
 
-	// for each training sample "i"
+	// For each training sample i
 	for i := 0; i < n; i++ {
-		// aVecs - are the activateFunc vectors for each layer
+		// aˡ are the activation vectors for each layer
 		aVecs := make([]types.Vector, 2+len(ff.hiddenLens))
 
-		// Step 1 - Initialize the first "a" vec with the input vector for each training sample
+		// Step 1 — Set a⁰ = input vector for this training sample
 		aVecs[0] = b.Inputs[i]
 
-		// Step 2 - Feed forward each layer l and compute the "z" vector for each layer l
-		// z_l = w^la^(l-1)+b_l
+		// Step 2 — Feedforward: compute zˡ and aˡ for each layer l
+		// zˡ = Wˡ·aˡ⁻¹ + bˡ
 		zVecs := make([]types.Vector, len(ff.hiddenLens)+1)
 		for l := 0; l < len(ff.hiddenLens)+1; l++ {
-			// weightsTimesA -  w^la^(l-1
+			// Wˡ · aˡ⁻¹
 			weightsTimesA := maths.MulMatrixVector(ff.Weights(l), aVecs[l])
-			// z[l] = weightsTimesA + b_j
+			// zˡ = Wˡ·aˡ⁻¹ + bˡ
 			zVecs[l] = maths.AddVectors(weightsTimesA, ff.Biases(l))
-			// a_l=sigma(z_l)
+			// aˡ = σ(zˡ)
 			aVecs[l+1] = maths.ApplyFuncToVector(zVecs[l], ff.activateFunc.Activate)
 		}
 
-		// Step 3 - compute output error in eta^L using the hadamart product of dC/da and sigma_prime(z^L)
+		// Step 3 — Compute output error δᴸ = ∂C/∂a ⊙ σ′(zᴸ)
 		deltaVecs := make([]types.Vector, len(ff.hiddenLens)+1)
 
-		// gradientAL = dC/da  at output layer (L)
+		// ∂C/∂aᴸ at the output layer
 		gradientAL, err := ff.costFunc.PartialCostA(b.Outputs[i], aVecs[len(aVecs)-1])
 		if err != nil {
 			return nil, fmt.Errorf("failed to compute partial cost derivative: %w", err)
 		}
 
-		// sigmaPrimeZL is sigma_prime(z^L)
+		// σ′(zᴸ)
 		sigmaPrimeZL := maths.ApplyFuncToVector(zVecs[len(zVecs)-1], ff.activateFunc.ActivatePrime)
 
-		// delta_L is the hadamart product of gradientAL and sigmaPrimeZL
+		// δᴸ = ∂C/∂aᴸ ⊙ σ′(zᴸ)
 		deltaVecs[len(deltaVecs)-1] = maths.MulElemVec(gradientAL, sigmaPrimeZL)
 
-		// Step 4 - backprop the error to compute delta for each layer l = L-1, L-2, ..., 1
-		// by doing delta^l = (w^(l+1))^T eta^(l+1) * sigma_prime(z^l)
+		// Step 4 — Backpropagate: δˡ = (Wˡ⁺¹)ᵀ · δˡ⁺¹ ⊙ σ′(zˡ)  for l = L−1, L−2, …, 1
 		for l := len(deltaVecs) - 2; l >= 0; l-- {
-			// w^T is the transpose of the weight matrix for layer l+1
+			// (Wˡ⁺¹)ᵀ
 			weightsTrans := maths.Transpose(ff.Weights(l + 1))
 
-			// weightsEtaProd is the product of the transposed weight matrix and the delta vector for layer l+1
+			// (Wˡ⁺¹)ᵀ · δˡ⁺¹
 			weightsEtaProd := maths.MulMatrixVector(weightsTrans, deltaVecs[l+1])
 
-			// sigmaPrimeZL is sigma_prime(z^l)
+			// σ′(zˡ)
 			sigmaPrimeZL := maths.ApplyFuncToVector(zVecs[l], ff.activateFunc.ActivatePrime)
 
-			// delta^l is the hadamart product of weightsEtaProd and sigmaPrimeZL
+			// δˡ = (Wˡ⁺¹)ᵀ · δˡ⁺¹ ⊙ σ′(zˡ)
 			deltaVecs[l] = maths.MulElemVec(weightsEtaProd, sigmaPrimeZL)
 		}
 
-		// Step 5 - compute gradient of cost function with respect to weights and biases
+		// Step 5 — Compute gradients: ∂C/∂Wˡ = δˡ ⊗ aˡ⁻¹,  ∂C/∂bˡ = δˡ
 		weightGradients := make([]types.Matrix, 0, len(ff.hiddenLens)+1)
 		biasGradients := make([]types.Vector, 0, len(ff.hiddenLens)+1)
 
 		for l := 0; l < len(deltaVecs); l++ {
-			// Gradient at dC/W^l is the outer product of delta^l and a^(l-1)
-			// As len(deltaVecs) = len(aVecs)-1, we can use l to index both deltaVecs and aVecs
+			// ∂C/∂Wˡ = δˡ ⊗ aˡ⁻¹  (outer product)
 			weightGradients = append(weightGradients, maths.OuterProduct(deltaVecs[l], aVecs[l]))
 
-			// Gradient at dC/db^l_j=delta^l_j
+			// ∂C/∂bˡ = δˡ
 			biasGradients = append(biasGradients, deltaVecs[l])
 		}
 
