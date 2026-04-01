@@ -37,6 +37,18 @@ func ApplyFuncToVector(v types.Vector, f func(float64) float64) types.Vector {
 	return result
 }
 
+// ApplyFuncToMatrix applies a function to each matrix element.
+func ApplyFuncToMatrix(m types.Matrix, f func(float64) float64) types.Matrix {
+	rows, cols := m.Dims()
+	data := make([]float64, rows*cols)
+	for i := range rows {
+		for j := range cols {
+			data[i*cols+j] = f(m.At(i, j))
+		}
+	}
+	return mat.NewDense(rows, cols, data)
+}
+
 // MulElemVec performs element-wise (Hadamard) multiplication of two vectors.
 func MulElemVec(a, b types.Vector) types.Vector {
 	var result mat.VecDense
@@ -55,5 +67,12 @@ func Transpose(m types.Matrix) types.Matrix {
 func OuterProduct(a, b types.Vector) types.Matrix {
 	var result mat.Dense
 	result.Outer(1, a, b)
+	return &result
+}
+
+// AddMatrix adds two matrices element-wise and returns the result.
+func AddMatrix(a, b types.Matrix) types.Matrix {
+	var result mat.Dense
+	result.Add(a, b)
 	return &result
 }

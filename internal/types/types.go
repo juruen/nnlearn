@@ -56,6 +56,9 @@ type TrainingBatch struct {
 
 	// Outputs is the output data for the training batch. Each vector in the slice represents a single training sample's expected output.
 	Outputs []Vector
+
+	// Learning Rate
+	LearningRate float64
 }
 
 // TrainSingleResult is the interim result of a single training sample
@@ -78,7 +81,14 @@ type TrainSingleResult struct {
 
 // TrainBatchResult holds the results of training a batch of samples.
 type TrainBatchResult struct {
+	// Results of each individual training sample in the batch
 	Results []TrainSingleResult
+
+	// UpdatedWeightGradients is the new weight gradients updated with the training batch result
+	UpdatedWeightGradients []Matrix
+
+	// UpdatedBiasGradients is the new  bias gradients updated with the training batch result
+	UpdatedBiasGradients []Vector
 }
 
 // Gradient represent a descent gradient matrix

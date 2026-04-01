@@ -97,6 +97,8 @@ func (ff *FeedForward) Train(b types.TrainingBatch) (*types.TrainBatchResult, er
 		result.Results = append(result.Results, *singleResult)
 	}
 
+	ff.applyBatchGradients(b.LearningRate, &result)
+
 	return &result, nil
 }
 
@@ -173,6 +175,10 @@ func (ff *FeedForward) trainSingleSample(input, output types.Vector) (*types.Tra
 
 // validateBatch checks that the training batch has consistent dimensions.
 func (ff *FeedForward) validateBatch(b types.TrainingBatch) error {
+	if b.LearningRate <= 0 {
+		return fmt.Errorf("learning rate must be positive, got %f", b.LearningRate)
+	}
+
 	if len(b.Inputs) != len(b.Outputs) {
 		return fmt.Errorf("inputs and outputs have different lengths")
 	}
@@ -192,6 +198,54 @@ func (ff *FeedForward) validateBatch(b types.TrainingBatch) error {
 	}
 
 	return nil
+}
+
+// applyBatchGradients performs the SGD weight update for a mini-batch.
+// For each layer l, it computes:
+//
+//	Wˡ = Wˡ − (η/n) · Σᵢ ∂C/∂Wˡᵢ
+//	bˡ = bˡ − (η/n) · Σᵢ ∂C/∂bˡᵢ
+//
+// where η is the learning rate, n is the batch size, and the sum is over all samples i.
+func (ff *FeedForward) applyBatchGradients(rate float64, result *types.TrainBatchResult) {
+	n := len(result.Results)
+	if n == 0 {
+		return
+	}
+
+	// η/n — learning rate scaled by batch size
+	rateByN := rate / float64(n)
+
+	result.UpdatedWeightGradients = make([]types.Matrix, 0, len(ff.hiddenLens)+1)
+	result.UpdatedBiasGradients = make([]types.Vector, 0, len(ff.hiddenLens)+1)
+
+	for i := range len(ff.weights) {
+		// Σᵢ ∂C/∂Wˡᵢ  and  Σᵢ ∂C/∂bˡᵢ  — sum gradients across all samples
+		w := result.Results[0].WeightGradients[i]
+		b := result.Results[0].BiasGradients[i]
+		for j := 1; j < len(result.Results); j++ {
+			w = maths.AddMatrix(w, result.Results[j].WeightGradients[i])
+			b = maths.AddVectors(b, result.Results[j].BiasGradients[i])
+		}
+
+		// −(η/n) · gradient
+		scale := func(v float64) float64 {
+			return -v * rateByN
+		}
+
+		// Wˡ = Wˡ − (η/n) · Σ ∂C/∂Wˡ
+		w = maths.ApplyFuncToMatrix(w, scale)
+		w = maths.AddMatrix(ff.weights[i], w)
+
+		// bˡ = bˡ − (η/n) · Σ ∂C/∂bˡ
+		b = maths.ApplyFuncToVector(b, scale)
+		b = maths.AddVectors(ff.biases[i], b)
+
+		ff.weights[i] = w
+		ff.biases[i] = b
+		result.UpdatedWeightGradients = append(result.UpdatedWeightGradients, w)
+		result.UpdatedBiasGradients = append(result.UpdatedBiasGradients, b)
+	}
 }
 
 func allLayers(inputLen int, hiddenLens []int, outputLen int) []int {

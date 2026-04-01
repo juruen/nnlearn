@@ -86,8 +86,9 @@ func TestTrain(t *testing.T) {
 		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
 
 		_, err := ff.Train(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(1, 2)},
-			Outputs: []types.Vector{vec(1), vec(0)},
+			Inputs:       []types.Vector{vec(1, 2)},
+			Outputs:      []types.Vector{vec(1), vec(0)},
+			LearningRate: 0.1,
 		})
 
 		require.Error(t, err)
@@ -98,8 +99,9 @@ func TestTrain(t *testing.T) {
 		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
 
 		_, err := ff.Train(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(1, 2, 3)},
-			Outputs: []types.Vector{vec(1)},
+			Inputs:       []types.Vector{vec(1, 2, 3)},
+			Outputs:      []types.Vector{vec(1)},
+			LearningRate: 0.1,
 		})
 
 		require.Error(t, err)
@@ -110,8 +112,9 @@ func TestTrain(t *testing.T) {
 		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
 
 		_, err := ff.Train(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(1, 2)},
-			Outputs: []types.Vector{vec(1, 2)},
+			Inputs:       []types.Vector{vec(1, 2)},
+			Outputs:      []types.Vector{vec(1, 2)},
+			LearningRate: 0.1,
 		})
 
 		require.Error(t, err)
@@ -122,8 +125,9 @@ func TestTrain(t *testing.T) {
 		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
 
 		result, err := ff.Train(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(0.5, 0.8)},
-			Outputs: []types.Vector{vec(1)},
+			Inputs:       []types.Vector{vec(0.5, 0.8)},
+			Outputs:      []types.Vector{vec(1)},
+			LearningRate: 0.1,
 		})
 
 		require.NoError(t, err)
@@ -145,8 +149,9 @@ func TestTrain(t *testing.T) {
 		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
 
 		result, err := ff.Train(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(0.5, 0.8)},
-			Outputs: []types.Vector{vec(1)},
+			Inputs:       []types.Vector{vec(0.5, 0.8)},
+			Outputs:      []types.Vector{vec(1)},
+			LearningRate: 0.1,
 		})
 
 		require.NoError(t, err)
@@ -167,8 +172,9 @@ func TestTrain(t *testing.T) {
 		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
 
 		result, err := ff.Train(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(0.5, 0.8), vec(0.1, 0.9), vec(0.3, 0.4)},
-			Outputs: []types.Vector{vec(1), vec(0), vec(1)},
+			Inputs:       []types.Vector{vec(0.5, 0.8), vec(0.1, 0.9), vec(0.3, 0.4)},
+			Outputs:      []types.Vector{vec(1), vec(0), vec(1)},
+			LearningRate: 0.1,
 		})
 
 		require.NoError(t, err)
@@ -177,8 +183,9 @@ func TestTrain(t *testing.T) {
 
 	t.Run("deterministic with same seed", func(t *testing.T) {
 		batch := types.TrainingBatch{
-			Inputs:  []types.Vector{vec(0.5, 0.8)},
-			Outputs: []types.Vector{vec(1)},
+			Inputs:       []types.Vector{vec(0.5, 0.8)},
+			Outputs:      []types.Vector{vec(1)},
+			LearningRate: 0.1,
 		}
 
 		ff1 := NewFeedForward(2, []int{3}, 1, WithSeed(42))
@@ -205,8 +212,9 @@ func TestTrain(t *testing.T) {
 		ff := NewFeedForward(2, nil, 1, WithSeed(42))
 
 		result, err := ff.Train(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(0.5, 0.8)},
-			Outputs: []types.Vector{vec(1)},
+			Inputs:       []types.Vector{vec(0.5, 0.8)},
+			Outputs:      []types.Vector{vec(1)},
+			LearningRate: 0.1,
 		})
 
 		require.NoError(t, err)
@@ -224,8 +232,9 @@ func TestTrain(t *testing.T) {
 		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
 
 		result, err := ff.Train(types.TrainingBatch{
-			Inputs:  []types.Vector{},
-			Outputs: []types.Vector{},
+			Inputs:       []types.Vector{},
+			Outputs:      []types.Vector{},
+			LearningRate: 0.1,
 		})
 
 		require.NoError(t, err)
@@ -446,16 +455,38 @@ func TestValidateBatch(t *testing.T) {
 
 	t.Run("valid batch", func(t *testing.T) {
 		err := ff.validateBatch(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(1, 2), vec(3, 4)},
-			Outputs: []types.Vector{vec(1), vec(0)},
+			Inputs:       []types.Vector{vec(1, 2), vec(3, 4)},
+			Outputs:      []types.Vector{vec(1), vec(0)},
+			LearningRate: 0.1,
 		})
 		require.NoError(t, err)
 	})
 
+	t.Run("zero learning rate", func(t *testing.T) {
+		err := ff.validateBatch(types.TrainingBatch{
+			Inputs:       []types.Vector{vec(1, 2)},
+			Outputs:      []types.Vector{vec(1)},
+			LearningRate: 0,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "learning rate must be positive")
+	})
+
+	t.Run("negative learning rate", func(t *testing.T) {
+		err := ff.validateBatch(types.TrainingBatch{
+			Inputs:       []types.Vector{vec(1, 2)},
+			Outputs:      []types.Vector{vec(1)},
+			LearningRate: -0.5,
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "learning rate must be positive")
+	})
+
 	t.Run("mismatched input/output count", func(t *testing.T) {
 		err := ff.validateBatch(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(1, 2)},
-			Outputs: []types.Vector{vec(1), vec(0)},
+			Inputs:       []types.Vector{vec(1, 2)},
+			Outputs:      []types.Vector{vec(1), vec(0)},
+			LearningRate: 0.1,
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "different lengths")
@@ -463,8 +494,9 @@ func TestValidateBatch(t *testing.T) {
 
 	t.Run("wrong input dimension", func(t *testing.T) {
 		err := ff.validateBatch(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(1, 2, 3)},
-			Outputs: []types.Vector{vec(1)},
+			Inputs:       []types.Vector{vec(1, 2, 3)},
+			Outputs:      []types.Vector{vec(1)},
+			LearningRate: 0.1,
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, types.ErrDimensionMismatch)
@@ -473,8 +505,9 @@ func TestValidateBatch(t *testing.T) {
 
 	t.Run("wrong output dimension", func(t *testing.T) {
 		err := ff.validateBatch(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(1, 2)},
-			Outputs: []types.Vector{vec(1, 2)},
+			Inputs:       []types.Vector{vec(1, 2)},
+			Outputs:      []types.Vector{vec(1, 2)},
+			LearningRate: 0.1,
 		})
 		require.Error(t, err)
 		assert.ErrorIs(t, err, types.ErrDimensionMismatch)
@@ -483,18 +516,142 @@ func TestValidateBatch(t *testing.T) {
 
 	t.Run("empty batch", func(t *testing.T) {
 		err := ff.validateBatch(types.TrainingBatch{
-			Inputs:  []types.Vector{},
-			Outputs: []types.Vector{},
+			Inputs:       []types.Vector{},
+			Outputs:      []types.Vector{},
+			LearningRate: 0.1,
 		})
 		require.NoError(t, err)
 	})
 
 	t.Run("error on second sample", func(t *testing.T) {
 		err := ff.validateBatch(types.TrainingBatch{
-			Inputs:  []types.Vector{vec(1, 2), vec(1, 2, 3)},
-			Outputs: []types.Vector{vec(1), vec(0)},
+			Inputs:       []types.Vector{vec(1, 2), vec(1, 2, 3)},
+			Outputs:      []types.Vector{vec(1), vec(0)},
+			LearningRate: 0.1,
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "sample 1")
+	})
+}
+
+func TestApplyBatchGradients(t *testing.T) {
+	t.Run("single sample updates weights correctly", func(t *testing.T) {
+		// W = [1, -1; 0, 2], b = [0, 1], η = 1.0, n = 1
+		// With η/n = 1, update is: W_new = W - gradient
+		ff := NewFeedForward(2, nil, 2, WithSeed(42))
+		ff.weights = []types.Matrix{mat.NewDense(2, 2, []float64{1, -1, 0, 2})}
+		ff.biases = []types.Vector{mat.NewVecDense(2, []float64{0, 1})}
+
+		wGrad := mat.NewDense(2, 2, []float64{0.1, 0.2, 0.3, 0.4})
+		bGrad := mat.NewVecDense(2, []float64{0.5, 0.6})
+
+		result := &types.TrainBatchResult{
+			Results: []types.TrainSingleResult{
+				{
+					WeightGradients: []types.Matrix{wGrad},
+					BiasGradients:   []types.Vector{bGrad},
+				},
+			},
+		}
+
+		ff.applyBatchGradients(1.0, result)
+
+		// W_new = W - (1/1) * grad = [1-0.1, -1-0.2; 0-0.3, 2-0.4]
+		assert.InDelta(t, 0.9, ff.weights[0].At(0, 0), 1e-10)
+		assert.InDelta(t, -1.2, ff.weights[0].At(0, 1), 1e-10)
+		assert.InDelta(t, -0.3, ff.weights[0].At(1, 0), 1e-10)
+		assert.InDelta(t, 1.6, ff.weights[0].At(1, 1), 1e-10)
+
+		// b_new = b - (1/1) * grad = [0-0.5, 1-0.6]
+		assert.InDelta(t, -0.5, ff.biases[0].AtVec(0), 1e-10)
+		assert.InDelta(t, 0.4, ff.biases[0].AtVec(1), 1e-10)
+	})
+
+	t.Run("averages gradients over batch", func(t *testing.T) {
+		// Two samples with η = 1.0: update = W - (1/2) * (grad1 + grad2)
+		ff := NewFeedForward(1, nil, 1, WithSeed(42))
+		ff.weights = []types.Matrix{mat.NewDense(1, 1, []float64{5.0})}
+		ff.biases = []types.Vector{mat.NewVecDense(1, []float64{3.0})}
+
+		result := &types.TrainBatchResult{
+			Results: []types.TrainSingleResult{
+				{
+					WeightGradients: []types.Matrix{mat.NewDense(1, 1, []float64{2.0})},
+					BiasGradients:   []types.Vector{mat.NewVecDense(1, []float64{4.0})},
+				},
+				{
+					WeightGradients: []types.Matrix{mat.NewDense(1, 1, []float64{6.0})},
+					BiasGradients:   []types.Vector{mat.NewVecDense(1, []float64{8.0})},
+				},
+			},
+		}
+
+		ff.applyBatchGradients(1.0, result)
+
+		// W = 5 - (1/2)*(2+6) = 5 - 4 = 1
+		assert.InDelta(t, 1.0, ff.weights[0].At(0, 0), 1e-10)
+		// b = 3 - (1/2)*(4+8) = 3 - 6 = -3
+		assert.InDelta(t, -3.0, ff.biases[0].AtVec(0), 1e-10)
+	})
+
+	t.Run("scales by learning rate", func(t *testing.T) {
+		// Single sample with η = 0.5, n = 1: update = W - 0.5 * gradient
+		ff := NewFeedForward(1, nil, 1, WithSeed(42))
+		ff.weights = []types.Matrix{mat.NewDense(1, 1, []float64{10.0})}
+		ff.biases = []types.Vector{mat.NewVecDense(1, []float64{4.0})}
+
+		result := &types.TrainBatchResult{
+			Results: []types.TrainSingleResult{
+				{
+					WeightGradients: []types.Matrix{mat.NewDense(1, 1, []float64{2.0})},
+					BiasGradients:   []types.Vector{mat.NewVecDense(1, []float64{6.0})},
+				},
+			},
+		}
+
+		ff.applyBatchGradients(0.5, result)
+
+		// W = 10 - 0.5 * 2 = 9
+		assert.InDelta(t, 9.0, ff.weights[0].At(0, 0), 1e-10)
+		// b = 4 - 0.5 * 6 = 1
+		assert.InDelta(t, 1.0, ff.biases[0].AtVec(0), 1e-10)
+	})
+
+	t.Run("empty batch is a no-op", func(t *testing.T) {
+		ff := NewFeedForward(2, nil, 2, WithSeed(42))
+		ff.weights = []types.Matrix{mat.NewDense(2, 2, []float64{1, 2, 3, 4})}
+		ff.biases = []types.Vector{mat.NewVecDense(2, []float64{5, 6})}
+
+		result := &types.TrainBatchResult{Results: nil}
+		ff.applyBatchGradients(1.0, result)
+
+		assert.Equal(t, 1.0, ff.weights[0].At(0, 0))
+		assert.Equal(t, 2.0, ff.weights[0].At(0, 1))
+		assert.Equal(t, 5.0, ff.biases[0].AtVec(0))
+		assert.Equal(t, 6.0, ff.biases[0].AtVec(1))
+	})
+
+	t.Run("populates UpdatedWeightGradients and UpdatedBiasGradients", func(t *testing.T) {
+		ff := NewFeedForward(2, nil, 1, WithSeed(42))
+		ff.weights = []types.Matrix{mat.NewDense(1, 2, []float64{1, 2})}
+		ff.biases = []types.Vector{mat.NewVecDense(1, []float64{3})}
+
+		result := &types.TrainBatchResult{
+			Results: []types.TrainSingleResult{
+				{
+					WeightGradients: []types.Matrix{mat.NewDense(1, 2, []float64{0.1, 0.2})},
+					BiasGradients:   []types.Vector{mat.NewVecDense(1, []float64{0.3})},
+				},
+			},
+		}
+
+		ff.applyBatchGradients(1.0, result)
+
+		require.Len(t, result.UpdatedWeightGradients, 1)
+		require.Len(t, result.UpdatedBiasGradients, 1)
+
+		// Updated values should match the new weights/biases
+		assert.Equal(t, ff.weights[0].At(0, 0), result.UpdatedWeightGradients[0].At(0, 0))
+		assert.Equal(t, ff.biases[0].AtVec(0), result.UpdatedBiasGradients[0].AtVec(0))
 	})
 }

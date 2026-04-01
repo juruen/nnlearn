@@ -338,3 +338,101 @@ func TestOuterProduct(t *testing.T) {
 		}
 	})
 }
+
+func TestAddMatrix(t *testing.T) {
+	t.Run("basic addition", func(t *testing.T) {
+		a := mat.NewDense(2, 2, []float64{1, 2, 3, 4})
+		b := mat.NewDense(2, 2, []float64{5, 6, 7, 8})
+
+		result := AddMatrix(a, b)
+
+		r, c := result.Dims()
+		assert.Equal(t, 2, r)
+		assert.Equal(t, 2, c)
+		assert.InDelta(t, 6.0, result.At(0, 0), 1e-10)
+		assert.InDelta(t, 8.0, result.At(0, 1), 1e-10)
+		assert.InDelta(t, 10.0, result.At(1, 0), 1e-10)
+		assert.InDelta(t, 12.0, result.At(1, 1), 1e-10)
+	})
+
+	t.Run("non-square matrix", func(t *testing.T) {
+		a := mat.NewDense(2, 3, []float64{1, 2, 3, 4, 5, 6})
+		b := mat.NewDense(2, 3, []float64{10, 20, 30, 40, 50, 60})
+
+		result := AddMatrix(a, b)
+
+		r, c := result.Dims()
+		assert.Equal(t, 2, r)
+		assert.Equal(t, 3, c)
+		assert.InDelta(t, 11.0, result.At(0, 0), 1e-10)
+		assert.InDelta(t, 22.0, result.At(0, 1), 1e-10)
+		assert.InDelta(t, 33.0, result.At(0, 2), 1e-10)
+		assert.InDelta(t, 44.0, result.At(1, 0), 1e-10)
+		assert.InDelta(t, 55.0, result.At(1, 1), 1e-10)
+		assert.InDelta(t, 66.0, result.At(1, 2), 1e-10)
+	})
+
+	t.Run("add zero matrix", func(t *testing.T) {
+		a := mat.NewDense(2, 2, []float64{1, 2, 3, 4})
+		b := mat.NewDense(2, 2, nil)
+
+		result := AddMatrix(a, b)
+
+		r, c := result.Dims()
+		assert.Equal(t, 2, r)
+		assert.Equal(t, 2, c)
+		assert.InDelta(t, 1.0, result.At(0, 0), 1e-10)
+		assert.InDelta(t, 2.0, result.At(0, 1), 1e-10)
+		assert.InDelta(t, 3.0, result.At(1, 0), 1e-10)
+		assert.InDelta(t, 4.0, result.At(1, 1), 1e-10)
+	})
+}
+
+func TestApplyFuncToMatrix(t *testing.T) {
+	t.Run("double each element", func(t *testing.T) {
+		m := mat.NewDense(2, 3, []float64{1, 2, 3, 4, 5, 6})
+
+		result := ApplyFuncToMatrix(m, func(x float64) float64 { return x * 2 })
+
+		r, c := result.Dims()
+		require.Equal(t, 2, r)
+		require.Equal(t, 3, c)
+		assert.InDelta(t, 2.0, result.At(0, 0), 1e-10)
+		assert.InDelta(t, 4.0, result.At(0, 1), 1e-10)
+		assert.InDelta(t, 6.0, result.At(0, 2), 1e-10)
+		assert.InDelta(t, 8.0, result.At(1, 0), 1e-10)
+		assert.InDelta(t, 10.0, result.At(1, 1), 1e-10)
+		assert.InDelta(t, 12.0, result.At(1, 2), 1e-10)
+	})
+
+	t.Run("square each element", func(t *testing.T) {
+		m := mat.NewDense(2, 2, []float64{2, 3, 4, 5})
+
+		result := ApplyFuncToMatrix(m, func(x float64) float64 { return x * x })
+
+		assert.InDelta(t, 4.0, result.At(0, 0), 1e-10)
+		assert.InDelta(t, 9.0, result.At(0, 1), 1e-10)
+		assert.InDelta(t, 16.0, result.At(1, 0), 1e-10)
+		assert.InDelta(t, 25.0, result.At(1, 1), 1e-10)
+	})
+
+	t.Run("apply math.Abs", func(t *testing.T) {
+		m := mat.NewDense(2, 2, []float64{-1, 2, -3, 4})
+
+		result := ApplyFuncToMatrix(m, math.Abs)
+
+		assert.InDelta(t, 1.0, result.At(0, 0), 1e-10)
+		assert.InDelta(t, 2.0, result.At(0, 1), 1e-10)
+		assert.InDelta(t, 3.0, result.At(1, 0), 1e-10)
+		assert.InDelta(t, 4.0, result.At(1, 1), 1e-10)
+	})
+
+	t.Run("does not mutate input", func(t *testing.T) {
+		m := mat.NewDense(1, 2, []float64{5, 10})
+
+		ApplyFuncToMatrix(m, func(x float64) float64 { return x + 1 })
+
+		assert.Equal(t, 5.0, m.At(0, 0))
+		assert.Equal(t, 10.0, m.At(0, 1))
+	})
+}
