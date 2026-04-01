@@ -117,4 +117,7 @@ type NeuralNetwork interface {
 
 	// Predict takes an input and returns the predicted output using the existing weights and biases
 	Predict(input Vector) (Vector, error)
+
+	// Save serializes the neural network to a file at the given path.
+	Save(path string) error
 }
