@@ -1,6 +1,9 @@
-.PHONY: audit test data
+.PHONY: audit test data build
 
 MNIST_URL := https://storage.googleapis.com/cvdf-datasets/mnist
+
+build:
+	go build -o bin/digits ./cmd/digits
 
 audit:
 	golangci-lint run ./...
