@@ -1,6 +1,7 @@
 package nn
 
 import (
+	"math"
 	"math/rand/v2"
 
 	"nnlearn/internal/activation"
@@ -32,11 +33,13 @@ func defaultOptions() options {
 	}
 }
 
-// XavierInitializer initializes weights to random values in [0, 1) and biases to zero.
+// XavierInitializer initializes weights with Xavier/Glorot uniform initialization
+// and biases to zero.
 func XavierInitializer(rng *rand.Rand, neurons, inputs int) (types.Matrix, types.Vector) {
+	limit := math.Sqrt(6.0 / float64(inputs+neurons))
 	weights := make([]float64, neurons*inputs)
 	for i := range weights {
-		weights[i] = rng.Float64()
+		weights[i] = (rng.Float64()*2 - 1) * limit
 	}
 	return mat.NewDense(neurons, inputs, weights), mat.NewVecDense(neurons, nil)
 }

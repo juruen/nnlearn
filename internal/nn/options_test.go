@@ -1,6 +1,7 @@
 package nn
 
 import (
+	"math"
 	"math/rand/v2"
 	"testing"
 
@@ -20,17 +21,33 @@ func TestXavierInitializer(t *testing.T) {
 		assert.Equal(t, 5, biases.Len())
 	})
 
-	t.Run("weights in range [0, 1)", func(t *testing.T) {
+	t.Run("weights stay within xavier bounds", func(t *testing.T) {
 		weights, _ := XavierInitializer(rng, 10, 8)
+		limit := math.Sqrt(6.0 / float64(10+8))
 
 		rows, cols := weights.Dims()
 		for r := range rows {
 			for c := range cols {
 				v := weights.At(r, c)
-				assert.GreaterOrEqual(t, v, 0.0)
-				assert.Less(t, v, 1.0)
+				assert.GreaterOrEqual(t, v, -limit)
+				assert.LessOrEqual(t, v, limit)
 			}
 		}
+	})
+
+	t.Run("weights are zero-centered", func(t *testing.T) {
+		weights, _ := XavierInitializer(rng, 200, 100)
+
+		rows, cols := weights.Dims()
+		sum := 0.0
+		for r := range rows {
+			for c := range cols {
+				sum += weights.At(r, c)
+			}
+		}
+
+		mean := sum / float64(rows*cols)
+		assert.InDelta(t, 0.0, mean, 0.02)
 	})
 
 	t.Run("biases are zero", func(t *testing.T) {
