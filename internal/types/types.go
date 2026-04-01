@@ -114,4 +114,7 @@ type NeuralNetwork interface {
 	// Train trains a batch of training samples. Internally, the NN updates its weights based on the
 	// computed gradient. This intermediate gradient is also returned.
 	Train(batch TrainingBatch) (result *TrainBatchResult, err error)
+
+	// Predict takes an input and returns the predicted output using the existing weights and biases
+	Predict(input Vector) (Vector, error)
 }

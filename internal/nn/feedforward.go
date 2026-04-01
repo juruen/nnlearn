@@ -102,6 +102,30 @@ func (ff *FeedForward) Train(b types.TrainingBatch) (*types.TrainBatchResult, er
 	return &result, nil
 }
 
+// Predict takes an input and returns the predicted output using the existing weights and biases.
+func (ff *FeedForward) Predict(input types.Vector) (types.Vector, error) {
+	if input.Len() != ff.inputLen {
+		return nil, fmt.Errorf("%w: input length mismatch: expected %d, got %d",
+			types.ErrDimensionMismatch, ff.inputLen, input.Len())
+	}
+
+	aVecs := make([]types.Vector, 2+len(ff.hiddenLens))
+
+	// Step 1 — Set a⁰ = input vector
+	aVecs[0] = input
+
+	// Step 2 — Feedforward: compute zˡ and aˡ for each layer l
+	// zˡ = Wˡ·aˡ⁻¹ + bˡ
+	// aˡ = σ(zˡ)
+	for l := 0; l < len(ff.hiddenLens)+1; l++ {
+		z := maths.AddVectors(maths.MulMatrixVector(ff.Weights(l), aVecs[l]), ff.Biases(l))
+		aVecs[l+1] = maths.ApplyFuncToVector(z, ff.activateFunc.Activate)
+	}
+
+	// Step 3 — Return the output vector
+	return aVecs[len(aVecs)-1], nil
+}
+
 // trainSingleSample runs backpropagation on a single training sample and returns the result.
 func (ff *FeedForward) trainSingleSample(input, output types.Vector) (*types.TrainSingleResult, error) {
 	// aˡ are the activation vectors for each layer
@@ -112,6 +136,7 @@ func (ff *FeedForward) trainSingleSample(input, output types.Vector) (*types.Tra
 
 	// Step 2 — Feedforward: compute zˡ and aˡ for each layer l
 	// zˡ = Wˡ·aˡ⁻¹ + bˡ
+	// aˡ = σ(zˡ)
 	zVecs := make([]types.Vector, len(ff.hiddenLens)+1)
 	for l := 0; l < len(ff.hiddenLens)+1; l++ {
 		// Wˡ · aˡ⁻¹

@@ -655,3 +655,66 @@ func TestApplyBatchGradients(t *testing.T) {
 		assert.Equal(t, ff.biases[0].AtVec(0), result.UpdatedBiasGradients[0].AtVec(0))
 	})
 }
+
+func TestPredict(t *testing.T) {
+	t.Run("wrong input dimension", func(t *testing.T) {
+		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
+
+		_, err := ff.Predict(vec(1, 2, 3))
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, types.ErrDimensionMismatch)
+	})
+
+	t.Run("no hidden layers", func(t *testing.T) {
+		// Same setup as TestNoHiddenLayers: 2→2, known W and b
+		// x = [1, 2], W = [1 -1; 0 2], b = [0, 1]
+		// z = [-1, 5], a = σ(z) ≈ [0.26894, 0.99331]
+		ff := NewFeedForward(2, nil, 2, WithSeed(42))
+		ff.weights = []types.Matrix{mat.NewDense(2, 2, []float64{1, -1, 0, 2})}
+		ff.biases = []types.Vector{mat.NewVecDense(2, []float64{0, 1})}
+
+		result, err := ff.Predict(vec(1, 2))
+
+		require.NoError(t, err)
+		require.Equal(t, 2, result.Len())
+		assert.InDelta(t, 0.26894, result.AtVec(0), 1e-3)
+		assert.InDelta(t, 0.99331, result.AtVec(1), 1e-3)
+	})
+
+	t.Run("two layers", func(t *testing.T) {
+		// Same setup as TestTwoLayersTrain: 2→2→1
+		// a² ≈ [0.77400]
+		ff := NewFeedForward(2, []int{2}, 1, WithSeed(42))
+		ff.weights = []types.Matrix{
+			mat.NewDense(2, 2, []float64{1, -1, 0, 1}),
+			mat.NewDense(1, 2, []float64{1, 1}),
+		}
+		ff.biases = []types.Vector{
+			mat.NewVecDense(2, []float64{0, 0}),
+			mat.NewVecDense(1, []float64{0}),
+		}
+
+		result, err := ff.Predict(vec(1, 0))
+
+		require.NoError(t, err)
+		require.Equal(t, 1, result.Len())
+		assert.InDelta(t, 0.77400, result.AtVec(0), 1e-3)
+	})
+
+	t.Run("matches trainSingleSample output", func(t *testing.T) {
+		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
+
+		predicted, err := ff.Predict(vec(0.5, 0.8))
+		require.NoError(t, err)
+
+		trainResult, err := ff.trainSingleSample(vec(0.5, 0.8), vec(1))
+		require.NoError(t, err)
+
+		// Predict output should equal the last activation vector from training
+		lastA := trainResult.AVectors[len(trainResult.AVectors)-1]
+		for i := range predicted.Len() {
+			assert.Equal(t, lastA.AtVec(i), predicted.AtVec(i))
+		}
+	})
+}
