@@ -65,12 +65,12 @@ async function initialize() {
   statusEl.textContent = "Starting WebAssembly runtime…";
 
   const go = new Go();
-  const wasmModule = await loadWasmModule("/app.wasm", go.importObject);
+  const wasmModule = await loadWasmModule("./app.wasm", go.importObject);
   go.run(wasmModule.instance);
   await waitFor(() => window.nnlearn && typeof window.nnlearn.loadModel === "function");
 
   statusEl.textContent = "Loading model/model.json…";
-  const response = await fetch("/model/model.json");
+  const response = await fetch("./model/model.json");
   if (!response.ok) {
     throw new Error(`failed to load model/model.json: ${response.status} ${response.statusText}`);
   }
@@ -167,7 +167,7 @@ function setControlsEnabled(enabled) {
 async function loadTrainingSamples() {
   samplesStatusEl.textContent = "Loading training examples…";
 
-  const response = await fetch("/training-samples");
+  const response = await fetch("./training-samples.json");
   if (!response.ok) {
     throw new Error(`failed to load training samples: ${response.status} ${response.statusText}`);
   }
