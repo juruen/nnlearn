@@ -68,14 +68,9 @@ func (ff *FeedForward) Save(path string) error {
 	return nil
 }
 
-// LoadFeedForward loads a neural network from a JSON file at the given path.
+// LoadFeedForwardBytes loads a neural network from serialized JSON data.
 // Options (activation, cost) can be provided to configure the loaded network.
-func LoadFeedForward(path string, opts ...Option) (*FeedForward, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
+func LoadFeedForwardBytes(data []byte, opts ...Option) (*FeedForward, error) {
 	var s serializedNN
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal neural network: %w", err)
@@ -103,4 +98,15 @@ func LoadFeedForward(path string, opts ...Option) (*FeedForward, error) {
 		activateFunc: o.activation,
 		costFunc:     o.cost,
 	}, nil
+}
+
+// LoadFeedForward loads a neural network from a JSON file at the given path.
+// Options (activation, cost) can be provided to configure the loaded network.
+func LoadFeedForward(path string, opts ...Option) (*FeedForward, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return LoadFeedForwardBytes(data, opts...)
 }

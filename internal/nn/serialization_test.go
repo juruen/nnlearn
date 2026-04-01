@@ -68,6 +68,31 @@ func TestSaveAndLoad(t *testing.T) {
 		}
 	})
 
+	t.Run("predict matches after byte load", func(t *testing.T) {
+		ff := NewFeedForward(2, []int{3}, 1, WithSeed(42))
+
+		dir := t.TempDir()
+		path := filepath.Join(dir, "nn.json")
+		require.NoError(t, ff.Save(path))
+
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+
+		loaded, err := LoadFeedForwardBytes(data)
+		require.NoError(t, err)
+
+		input := vec(0.5, 0.8)
+		expected, err := ff.Predict(input)
+		require.NoError(t, err)
+
+		actual, err := loaded.Predict(input)
+		require.NoError(t, err)
+
+		for i := range expected.Len() {
+			assert.Equal(t, expected.AtVec(i), actual.AtVec(i))
+		}
+	})
+
 	t.Run("custom weights round trip", func(t *testing.T) {
 		ff := NewFeedForward(2, nil, 2, WithSeed(42))
 		ff.weights = []types.Matrix{mat.NewDense(2, 2, []float64{1, -1, 0, 2})}
@@ -100,6 +125,11 @@ func TestSaveAndLoad(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("not json"), 0644))
 
 		_, err := LoadFeedForward(path)
+		require.Error(t, err)
+	})
+
+	t.Run("load invalid bytes", func(t *testing.T) {
+		_, err := LoadFeedForwardBytes([]byte("not json"))
 		require.Error(t, err)
 	})
 }

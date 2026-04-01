@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>nnlearn digit recognizer</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="page">
+      <section class="panel">
+        <h1>Digit recognizer</h1>
+        <p class="lede">Draw a single digit in the 28×28 frame, then click <strong>Recognize</strong>.</p>
+
+        <div class="canvas-shell">
+          <div class="canvas-grid" aria-hidden="true"></div>
+          <canvas
+            id="digit-canvas"
+            class="digit-canvas"
+            width="28"
+            height="28"
+            aria-label="28 by 28 digit drawing canvas"
+          ></canvas>
+        </div>
+
+        <div class="controls">
+          <button id="recognize-button" type="button">Recognize</button>
+          <button id="clear-button" type="button" class="secondary">Clear</button>
+        </div>
+
+        <p id="status" class="status" role="status">Loading WebAssembly model…</p>
+      </section>
+
+      <section class="panel result-panel">
+        <h2>Prediction</h2>
+        <div id="prediction" class="prediction">–</div>
+        <p id="confidence" class="confidence">Confidence: –</p>
+      </section>
+
+      <section class="panel samples-panel">
+        <div class="samples-header">
+          <div>
+            <h2>100 training examples</h2>
+            <p class="lede">These come from the MNIST training set served by the local Go app. Click one to copy it into the recognizer.</p>
+          </div>
+        </div>
+        <div id="samples-status" class="status" role="status">Loading training examples…</div>
+        <div id="samples-grid" class="samples-grid" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <script src="/wasm_exec.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

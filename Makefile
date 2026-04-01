@@ -1,9 +1,15 @@
-.PHONY: audit test data build
+.PHONY: audit test data build build-web build-wasm
 
 MNIST_URL := https://storage.googleapis.com/cvdf-datasets/mnist
 
 build:
 	go build -o bin/digits ./cmd/digits
+
+build-web: build-wasm
+	go build -o bin/nnlearn-web .
+
+build-wasm:
+	GOOS=js GOARCH=wasm go build -o web/app.wasm ./cmd/recognizer-wasm
 
 audit:
 	golangci-lint run ./...
